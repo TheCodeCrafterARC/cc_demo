@@ -15,6 +15,46 @@ interface DayData {
 type HabitStore = Record<string, DayData>;
 
 const STORAGE_KEY = 'habit-tracker-v2';
+const COURSE_STORAGE_KEY = 'skilljar-courses-v1';
+// Use explicit year/month/day to avoid UTC-parsing timezone shift
+const CHALLENGE_START_MS = new Date(2026, 3, 9).setHours(0, 0, 0, 0); // April 9, local time
+
+interface Course {
+  id: string;
+  name: string;
+  hours: number;
+  phase: 1 | 2 | 3;
+  dayStart: number;
+  dayEnd: number;
+}
+
+const COURSES: Course[] = [
+  // Phase 1 — AI Fluency Foundation (Days 1–30) · 1–3 hrs each
+  { id: 'claude-101',           name: 'Claude 101',                              hours: 1.5, phase: 1, dayStart: 1,  dayEnd: 3  },
+  { id: 'ai-fluency-framework', name: 'AI Fluency: Framework & Foundations',     hours: 2.5, phase: 1, dayStart: 4,  dayEnd: 7  },
+  { id: 'ai-fluency-students',  name: 'AI Fluency for Students',                 hours: 1.5, phase: 1, dayStart: 8,  dayEnd: 10 },
+  { id: 'ai-fluency-educators', name: 'AI Fluency for Educators',                hours: 2.5, phase: 1, dayStart: 11, dayEnd: 14 },
+  { id: 'ai-fluency-nonprofits',name: 'AI Fluency for Nonprofits',               hours: 1.5, phase: 1, dayStart: 15, dayEnd: 17 },
+  { id: 'teaching-ai-fluency',  name: 'Teaching AI Fluency',                     hours: 1.5, phase: 1, dayStart: 18, dayEnd: 20 },
+  { id: 'claude-code-action',   name: 'Claude Code in Action',                   hours: 1.0, phase: 1, dayStart: 21, dayEnd: 24 },
+  { id: 'ai-capabilities',      name: 'AI Capabilities and Limitations',         hours: 2.5, phase: 1, dayStart: 25, dayEnd: 30 },
+  // Phase 2 — Developer Track (Days 31–70) · 2–4 hrs each
+  { id: 'agent-skills',         name: 'Introduction to Agent Skills',            hours: 2.5, phase: 2, dayStart: 31, dayEnd: 38 },
+  { id: 'mcp-intro',            name: 'Intro to Model Context Protocol',         hours: 2.5, phase: 2, dayStart: 39, dayEnd: 46 },
+  { id: 'mcp-advanced',         name: 'Model Context Protocol: Advanced Topics', hours: 3.5, phase: 2, dayStart: 47, dayEnd: 56 },
+  { id: 'claude-bedrock',       name: 'Claude with Amazon Bedrock',              hours: 2.5, phase: 2, dayStart: 57, dayEnd: 63 },
+  { id: 'claude-vertex',        name: 'Claude with Google Cloud Vertex AI',      hours: 2.5, phase: 2, dayStart: 64, dayEnd: 70 },
+  // Phase 3 — Advanced (Days 71–100) · 5+ hrs
+  { id: 'subagents',            name: 'Introduction to Subagents',               hours: 2.5, phase: 3, dayStart: 71, dayEnd: 78 },
+  { id: 'claude-cowork',        name: 'Introduction to Claude Cowork',           hours: 1.5, phase: 3, dayStart: 79, dayEnd: 84 },
+  { id: 'claude-api',           name: 'Building with the Claude API',            hours: 8.0, phase: 3, dayStart: 85, dayEnd: 100 },
+];
+
+const PHASE_META = {
+  1: { label: 'Phase 1 — AI Fluency Foundation', days: '1–30',  color: '#7c3aed', bg: '#faf5ff', badge: 'bg-violet-100 text-violet-700' },
+  2: { label: 'Phase 2 — Developer Track',        days: '31–70', color: '#0891b2', bg: '#ecfeff', badge: 'bg-cyan-100 text-cyan-700' },
+  3: { label: 'Phase 3 — Advanced',               days: '71–100',color: '#b45309', bg: '#fffbeb', badge: 'bg-amber-100 text-amber-700' },
+};
 
 const HABIT_ICONS: { keywords: string[]; icon: string }[] = [
   { keywords: ['workout', 'exercise', 'gym', 'run', 'walk', 'yoga', 'stretch'], icon: '💪' },
@@ -66,6 +106,7 @@ export class HabitTracker {
   @State() selectedDate: Date = new Date();
   @State() showCalendar: boolean = false;
   @State() calendarViewDate: Date = new Date();
+  @State() courseCompletions: Record<string, boolean> = {};
 
   private inputRef!: HTMLInputElement;
 
@@ -73,6 +114,30 @@ export class HabitTracker {
 
   componentWillLoad() {
     this.loadDay(this.selectedDate);
+    this.loadCourses();
+  }
+
+  // ─── Course tracker ─────────────────────────────────────────────────────────
+
+  private loadCourses() {
+    try {
+      const raw = localStorage.getItem(COURSE_STORAGE_KEY);
+      this.courseCompletions = raw ? JSON.parse(raw) : {};
+    } catch {
+      this.courseCompletions = {};
+    }
+  }
+
+  private toggleCourse(id: string) {
+    const updated = { ...this.courseCompletions, [id]: !this.courseCompletions[id] };
+    this.courseCompletions = updated;
+    try { localStorage.setItem(COURSE_STORAGE_KEY, JSON.stringify(updated)); } catch { /* quota */ }
+  }
+
+  private currentDay(): number {
+    const todayMs = new Date().setHours(0, 0, 0, 0);
+    const elapsed = Math.floor((todayMs - CHALLENGE_START_MS) / 86400000);
+    return Math.min(100, Math.max(1, elapsed + 1));
   }
 
   // ─── Storage ────────────────────────────────────────────────────────────────
@@ -343,6 +408,164 @@ export class HabitTracker {
     );
   }
 
+  // ─── Course tracker render ──────────────────────────────────────────────────
+
+  private renderCourseTracker() {
+    const day = this.currentDay();
+    const done = COURSES.filter(c => this.courseCompletions[c.id]).length;
+    const total = COURSES.length;
+    const pct = Math.round((done / total) * 100);
+    const totalHours = COURSES.reduce((s, c) => s + c.hours, 0);
+    const doneHours = COURSES.filter(c => this.courseCompletions[c.id]).reduce((s, c) => s + c.hours, 0);
+
+    return (
+      <div class="mb-8 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-indigo-100/60 overflow-hidden">
+        {/* Accent bar */}
+        <div style={{ height: '4px', background: 'linear-gradient(90deg, #6366f1, #0891b2, #b45309)' }} />
+
+        {/* Header */}
+        <div class="px-7 pt-6 pb-4 flex items-start justify-between gap-6">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl">🎓</span>
+              <h2 class="text-lg font-bold text-gray-800 tracking-tight">Anthropic Skilljar — 100-Day Challenge</h2>
+            </div>
+            <p class="text-xs text-gray-400">Complete all 16 courses in 100 days · Started April 9, 2026</p>
+          </div>
+
+          {/* Stats pills */}
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <div class="text-center px-4 py-2 rounded-2xl border border-indigo-100" style={{ background: '#eef2ff' }}>
+              <div class="text-lg font-bold text-indigo-600 leading-none">Day {day}</div>
+              <div class="text-xs text-indigo-400 mt-0.5">of 100</div>
+            </div>
+            <div class="text-center px-4 py-2 rounded-2xl border border-violet-100" style={{ background: '#faf5ff' }}>
+              <div class="text-lg font-bold text-violet-600 leading-none">{done}/{total}</div>
+              <div class="text-xs text-violet-400 mt-0.5">courses</div>
+            </div>
+            <div class="text-center px-4 py-2 rounded-2xl border border-emerald-100" style={{ background: '#f0fdf4' }}>
+              <div class="text-lg font-bold text-emerald-600 leading-none">{doneHours.toFixed(1)}h</div>
+              <div class="text-xs text-emerald-400 mt-0.5">of {totalHours}h</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Overall progress bar */}
+        <div class="px-7 pb-5">
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Overall Progress</span>
+            <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{pct}%</span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+            <div
+              style={{
+                width: `${pct}%`,
+                height: '100%',
+                borderRadius: '9999px',
+                background: 'linear-gradient(90deg, #6366f1, #0891b2, #b45309)',
+                transition: 'width 0.7s ease',
+                boxShadow: pct > 0 ? '0 0 8px rgba(99,102,241,0.4)' : 'none',
+              }}
+            />
+          </div>
+          {/* Day ruler */}
+          <div class="flex justify-between mt-1">
+            <span class="text-xs text-gray-300">Day 1</span>
+            <span class="text-xs text-gray-300">Day 50</span>
+            <span class="text-xs text-gray-300">Day 100</span>
+          </div>
+        </div>
+
+        {/* Phase sections */}
+        <div class="px-7 pb-7 grid grid-cols-3 gap-5">
+          {([1, 2, 3] as const).map(phase => {
+            const meta = PHASE_META[phase];
+            const phaseCourses = COURSES.filter(c => c.phase === phase);
+            const phaseDone = phaseCourses.filter(c => this.courseCompletions[c.id]).length;
+            const phaseTotal = phaseCourses.length;
+            const phaseHours = phaseCourses.reduce((s, c) => s + c.hours, 0);
+            const phasePct = Math.round((phaseDone / phaseTotal) * 100);
+
+            return (
+              <div
+                key={phase}
+                class="rounded-2xl border overflow-hidden"
+                style={{ borderColor: `${meta.color}22`, background: meta.bg }}
+              >
+                {/* Phase header */}
+                <div class="px-4 py-3 border-b" style={{ borderColor: `${meta.color}22` }}>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold text-gray-700">{meta.label}</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${meta.color}18`, color: meta.color }}>
+                      Days {meta.days}
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between text-xs text-gray-400 mb-2">
+                    <span>{phaseDone}/{phaseTotal} done · {phaseHours}h total</span>
+                    <span style={{ color: meta.color, fontWeight: '600' }}>{phasePct}%</span>
+                  </div>
+                  <div class="w-full bg-white/60 rounded-full h-1.5 overflow-hidden">
+                    <div style={{ width: `${phasePct}%`, height: '100%', borderRadius: '9999px', background: meta.color, transition: 'width 0.6s ease' }} />
+                  </div>
+                </div>
+
+                {/* Course list */}
+                <div class="p-2">
+                  {phaseCourses.map(course => {
+                    const completed = !!this.courseCompletions[course.id];
+                    const isCurrent = day >= course.dayStart && day <= course.dayEnd;
+                    const isUpcoming = day < course.dayStart;
+                    return (
+                      <button
+                        key={course.id}
+                        onClick={() => this.toggleCourse(course.id)}
+                        class={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl mb-1 text-left transition-all duration-150 group ${
+                          completed ? 'bg-white/80' : isCurrent ? 'bg-white shadow-sm' : 'hover:bg-white/60'
+                        }`}
+                        style={{ border: isCurrent && !completed ? `1.5px solid ${meta.color}44` : '1.5px solid transparent' }}
+                      >
+                        {/* Checkbox */}
+                        <div
+                          class="flex-shrink-0 mt-0.5 w-4 h-4 rounded flex items-center justify-center transition-all duration-150"
+                          style={{
+                            background: completed ? meta.color : 'transparent',
+                            border: `2px solid ${completed ? meta.color : '#d1d5db'}`,
+                          }}
+                        >
+                          {completed && (
+                            <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+
+                        {/* Content */}
+                        <div class="flex-1 min-w-0">
+                          <div class={`text-xs font-medium leading-tight ${completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                            {course.name}
+                          </div>
+                          <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-xs text-gray-400">{course.hours}h · Days {course.dayStart}–{course.dayEnd}</span>
+                            {isCurrent && !completed && (
+                              <span class="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${meta.color}18`, color: meta.color }}>Now</span>
+                            )}
+                            {isUpcoming && (
+                              <span class="text-xs text-gray-300">upcoming</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // ─── Main render ────────────────────────────────────────────────────────────
 
   render() {
@@ -393,6 +616,9 @@ export class HabitTracker {
             </p>
             <p class="text-gray-300 mt-2 text-xs italic">"{dailyQuote()}"</p>
           </div>
+
+          {/* ── Course tracker ── */}
+          {this.renderCourseTracker()}
 
           {/* ── Two-column layout ── */}
           <div class="flex gap-6 items-start">

@@ -1,0 +1,18 @@
+{
+  "name": "habit-tracker",
+  "version": "1.0.0",
+  "description": "Daily habit tracker built with StencilJS and Tailwind CSS",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/global/input.css -o ./src/global/app.css --minify",
+    "build": "npm run build:css && stencil build",
+    "start": "concurrently \"tailwindcss -i ./src/global/input.css -o ./src/global/app.css --watch\" \"stencil build --dev --watch --serve\"",
+    "test": "stencil test --spec"
+  },
+  "devDependencies": {
+    "@stencil/core": "^4.22.0",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16"
+  }
+}

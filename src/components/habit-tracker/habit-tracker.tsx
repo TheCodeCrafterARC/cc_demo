@@ -16,6 +16,44 @@ type HabitStore = Record<string, DayData>;
 
 const STORAGE_KEY = 'habit-tracker-v2';
 
+const HABIT_ICONS: { keywords: string[]; icon: string }[] = [
+  { keywords: ['workout', 'exercise', 'gym', 'run', 'walk', 'yoga', 'stretch'], icon: '💪' },
+  { keywords: ['read', 'book', 'study', 'learn'], icon: '📚' },
+  { keywords: ['water', 'drink', 'hydrat'], icon: '💧' },
+  { keywords: ['meditat', 'mindful', 'breath', 'calm'], icon: '🧘' },
+  { keywords: ['journal', 'write', 'diary', 'reflect'], icon: '📝' },
+  { keywords: ['sleep', 'rest', 'nap', 'bed'], icon: '😴' },
+  { keywords: ['eat', 'meal', 'diet', 'nutrition', 'food', 'cook'], icon: '🥗' },
+  { keywords: ['gratitude', 'thankful', 'grateful'], icon: '🙏' },
+  { keywords: ['code', 'program', 'develop', 'build'], icon: '💻' },
+  { keywords: ['social', 'call', 'friend', 'family'], icon: '🤝' },
+  { keywords: ['clean', 'tidy', 'organiz'], icon: '🧹' },
+  { keywords: ['outside', 'nature', 'walk', 'fresh air'], icon: '🌿' },
+];
+
+function habitIcon(name: string): string {
+  const lower = name.toLowerCase();
+  for (const { keywords, icon } of HABIT_ICONS) {
+    if (keywords.some(k => lower.includes(k))) return icon;
+  }
+  return '✅';
+}
+
+const QUOTES = [
+  'Small steps every day lead to big changes.',
+  'Consistency is the key to lasting habits.',
+  'Every day is a fresh start.',
+  'Progress, not perfection.',
+  'You are one decision away from a different life.',
+  'Build the life you want, one habit at a time.',
+  'Today\'s efforts are tomorrow\'s results.',
+];
+
+function dailyQuote(): string {
+  const day = new Date().getDate();
+  return QUOTES[day % QUOTES.length];
+}
+
 @Component({
   tag: 'habit-tracker',
   shadow: false,
@@ -264,10 +302,16 @@ export class HabitTracker {
             {/* Top strip — title row */}
             <div
               class="flex items-center justify-between px-5 border-b-2"
-              style={{ borderColor: '#fca5a5', minHeight: '44px', background: '#fffef7' }}
+              style={{ borderColor: '#fca5a5', minHeight: '48px', background: '#fffef7' }}
             >
-              <span class="text-xs font-semibold tracking-wide text-rose-400 uppercase">Notes</span>
-              <span class="text-xs text-gray-400">{this.formattedDate(this.selectedDate)}</span>
+              <div class="flex items-center gap-2">
+                <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-400" />
+                <span class="text-sm font-bold tracking-widest text-rose-400 uppercase">Notes</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-300">{this.notes.length > 0 ? `${this.notes.length} chars` : ''}</span>
+                <span class="text-xs text-gray-400">{this.formattedDate(this.selectedDate)}</span>
+              </div>
             </div>
 
             {/* Ruled writing area */}
@@ -332,10 +376,22 @@ export class HabitTracker {
               </button>
               {this.showCalendar && this.renderCalendar()}
             </div>
-            <h1 class="text-4xl font-bold text-gray-800 tracking-tight">Daily Habits</h1>
-            <p class="text-gray-500 mt-1 text-sm">
-              {isViewingPast ? 'Viewing a past day — changes are saved automatically' : 'Track what matters every day'}
+            <h1
+              class="text-4xl font-bold tracking-tight"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
+            >
+              Daily Habits
+            </h1>
+            <p class="text-gray-400 mt-1.5 text-sm">
+              {isViewingPast
+                ? '🕐 Viewing a past day — changes are saved automatically'
+                : allDone && totalCount > 0
+                ? '🎉 All habits complete — amazing work today!'
+                : totalCount > 0 && completedCount > 0
+                ? `⚡ Keep going — ${totalCount - completedCount} habit${totalCount - completedCount !== 1 ? 's' : ''} left!`
+                : 'Track what matters every day'}
             </p>
+            <p class="text-gray-300 mt-2 text-xs italic">"{dailyQuote()}"</p>
           </div>
 
           {/* ── Two-column layout ── */}
@@ -343,7 +399,38 @@ export class HabitTracker {
 
             {/* ── LEFT: Habit tracker ── */}
             <div style={{ width: '400px', flexShrink: '0' }}>
-              <div class="bg-white rounded-3xl shadow-xl shadow-violet-100/50 overflow-hidden border border-violet-100/60">
+              <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl shadow-violet-100/60 overflow-hidden border border-violet-100/60">
+                {/* Gradient top accent bar */}
+                <div style={{ height: '4px', background: 'linear-gradient(90deg, #7c3aed, #6366f1, #818cf8)' }} />
+
+                {/* Stats ribbon */}
+                {totalCount > 0 && !isViewingPast && (
+                  <div class="flex items-center gap-5 px-5 py-3 border-b border-violet-50/80" style={{ background: 'linear-gradient(135deg, #faf5ff, #eef2ff)' }}>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">🔥</span>
+                      <div>
+                        <div class="text-lg font-bold text-gray-800 leading-none">1</div>
+                        <div class="text-xs text-gray-400 mt-0.5">day streak</div>
+                      </div>
+                    </div>
+                    <div class="w-px h-10 bg-violet-100" />
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">⚡</span>
+                      <div>
+                        <div class="text-lg font-bold text-gray-800 leading-none">{completedCount}</div>
+                        <div class="text-xs text-gray-400 mt-0.5">done today</div>
+                      </div>
+                    </div>
+                    <div class="w-px h-10 bg-violet-100" />
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">🎯</span>
+                      <div>
+                        <div class="text-lg font-bold text-gray-800 leading-none">{totalCount}</div>
+                        <div class="text-xs text-gray-400 mt-0.5">habits total</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Past banner */}
                 {isViewingPast && (
@@ -356,23 +443,48 @@ export class HabitTracker {
                   </div>
                 )}
 
-                {/* Progress bar */}
+                {/* Circular progress ring */}
                 {totalCount > 0 && (
-                  <div class="px-5 pt-5 pb-3">
-                    <div class="flex justify-between items-center mb-1.5">
-                      <span class="text-xs font-medium text-gray-500">Progress</span>
-                      <span class="text-xs font-semibold text-violet-600">{completedCount}/{totalCount}</span>
+                  <div class="px-5 pt-4 pb-3 flex items-center gap-5">
+                    {(() => {
+                      const pct = Math.round((completedCount / totalCount) * 100);
+                      const r = 30;
+                      const circ = 2 * Math.PI * r;
+                      const dash = (pct / 100) * circ;
+                      const color = allDone ? '#10b981' : '#7c3aed';
+                      return (
+                        <div class="relative flex-shrink-0" style={{ width: '76px', height: '76px' }}>
+                          <svg width="76" height="76" style={{ transform: 'rotate(-90deg)' }}>
+                            <circle cx="38" cy="38" r={r} fill="none" stroke="#d1d5db" stroke-width="8" />
+                            <circle
+                              cx="38" cy="38" r={r} fill="none"
+                              stroke={color} stroke-width="8"
+                              stroke-linecap="round"
+                              stroke-dasharray={`${dash} ${circ}`}
+                              style={{ transition: 'stroke-dasharray 0.6s ease', filter: `drop-shadow(0 0 4px ${color}66)` }}
+                            />
+                          </svg>
+                          <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-sm font-bold" style={{ color }}>{pct}%</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <div class="flex-1">
+                      <div class="text-sm font-semibold text-gray-700 mb-0.5">
+                        {allDone ? '🎉 All done!' : `${completedCount} of ${totalCount} complete`}
+                      </div>
+                      <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          class="h-1.5 rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.round((completedCount / totalCount) * 100)}%`,
+                            background: allDone ? 'linear-gradient(90deg,#10b981,#34d399)' : 'linear-gradient(90deg,#7c3aed,#818cf8)',
+                          }}
+                        />
+                      </div>
+                      <div class="text-xs text-gray-400 mt-1">{totalCount - completedCount} remaining today</div>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        class="h-2 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.round((completedCount / totalCount) * 100)}%`,
-                          background: allDone ? 'linear-gradient(90deg,#10b981,#34d399)' : 'linear-gradient(90deg,#7c3aed,#a78bfa)',
-                        }}
-                      />
-                    </div>
-                    {allDone && <p class="text-center text-xs text-emerald-500 font-medium mt-2">All done! 🎉</p>}
                   </div>
                 )}
 
@@ -390,7 +502,8 @@ export class HabitTracker {
                     <button
                       onClick={() => this.addHabit()}
                       disabled={!this.newHabitName.trim()}
-                      class="bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-all duration-150 shadow-md shadow-violet-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                      class="active:scale-95 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-all duration-150 shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)', boxShadow: '0 4px 12px rgba(124,58,237,0.35)' }}
                     >
                       + Add
                     </button>
@@ -400,26 +513,31 @@ export class HabitTracker {
                 <div class="border-t border-gray-100 mx-5" />
 
                 {/* Habit list */}
-                <div class="px-5 py-4 space-y-2" style={{ minHeight: '80px' }}>
+                <div class="px-5 py-4" style={{ minHeight: '80px' }}>
                   {this.habits.length === 0 ? (
                     <div class="text-center py-8">
                       <div class="text-4xl mb-2">✨</div>
                       <p class="text-gray-400 text-sm">No habits yet. Add one above!</p>
                     </div>
-                  ) : (
-                    this.habits.map(habit => (
+                  ) : (() => {
+                    const pending = this.habits.filter(h => !h.completed);
+                    const done = this.habits.filter(h => h.completed);
+                    const hasBoth = pending.length > 0 && done.length > 0;
+                    const row = (habit: Habit) => (
                       <div
                         key={habit.id}
-                        class={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group ${
+                        class={`flex items-center gap-3 p-3 mb-2 rounded-xl transition-all duration-200 group border-l-4 hover:scale-[1.01] hover:shadow-md ${
                           habit.completed
-                            ? 'bg-violet-50 border border-violet-100'
-                            : 'bg-gray-50 border border-gray-100 hover:border-violet-200 hover:bg-violet-50/40'
+                            ? 'bg-emerald-50/60 border border-emerald-100 border-l-emerald-400'
+                            : 'bg-gray-50 border border-gray-100 border-l-violet-400 hover:border-violet-200 hover:bg-violet-50/40'
                         }`}
                       >
                         <button
                           onClick={() => this.toggleHabit(habit.id)}
                           class={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                            habit.completed ? 'bg-violet-600 border-violet-600' : 'border-gray-300 bg-white hover:border-violet-400'
+                            habit.completed
+                              ? 'border-emerald-500 bg-emerald-500'
+                              : 'border-gray-300 bg-white hover:border-violet-400'
                           }`}
                         >
                           {habit.completed && (
@@ -428,6 +546,7 @@ export class HabitTracker {
                             </svg>
                           )}
                         </button>
+                        <span class="text-base leading-none select-none">{habitIcon(habit.name)}</span>
                         <span class={`flex-1 text-sm font-medium transition-all duration-200 ${habit.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
                           {habit.name}
                         </span>
@@ -440,22 +559,27 @@ export class HabitTracker {
                           </svg>
                         </button>
                       </div>
-                    ))
-                  )}
+                    );
+                    return (
+                      <div>
+                        {hasBoth && <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 mb-2">Pending</div>}
+                        {pending.map(row)}
+                        {hasBoth && <div class="text-xs font-semibold text-emerald-500 uppercase tracking-wide px-1 mt-3 mb-2">Completed</div>}
+                        {done.map(row)}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Footer */}
-                {this.habits.length > 0 && (
-                  <div class="px-5 pb-5 pt-1 flex items-center justify-between">
-                    <span class="text-xs text-gray-400">{totalCount - completedCount} remaining</span>
-                    {completedCount > 0 && (
-                      <button
-                        onClick={() => this.clearCompleted()}
-                        class="text-xs font-medium text-violet-500 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-all duration-150"
-                      >
-                        Clear selections
-                      </button>
-                    )}
+                {completedCount > 0 && (
+                  <div class="px-5 pb-5 pt-1 flex items-center justify-end">
+                    <button
+                      onClick={() => this.clearCompleted()}
+                      class="text-xs font-medium text-violet-500 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-all duration-150"
+                    >
+                      Clear selections
+                    </button>
                   </div>
                 )}
               </div>
